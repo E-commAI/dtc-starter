@@ -1,0 +1,9 @@
+#!/bin/sh
+# Resolves the Deno binary: repo-local ./deno first, then system deno.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -x "$REPO_ROOT/deno" ]; then
+  exec "$REPO_ROOT/deno" "$@"
+else
+  exec deno "$@"
+fi

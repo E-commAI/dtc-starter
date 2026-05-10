@@ -1,0 +1,12 @@
+#!/bin/sh
+# Shim: delegates `npx` calls to Deno's npm package runner.
+# Resolves: repo-local ./deno first, then system deno.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -x "$REPO_ROOT/deno" ]; then
+  DENO="$REPO_ROOT/deno"
+else
+  DENO="deno"
+fi
+
+exec "$DENO" run -A "npm:$@"

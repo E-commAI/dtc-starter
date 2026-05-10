@@ -1,0 +1,28 @@
+#!/bin/sh
+# Shim: delegates `npm` calls to Deno equivalents.
+# Resolves: repo-local ./deno first, then system deno.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -x "$REPO_ROOT/deno" ]; then
+  DENO="$REPO_ROOT/deno"
+else
+  DENO="deno"
+fi
+
+case "$1" in
+  install|ci)
+    shift
+    exec "$DENO" install --node-modules-dir=auto --allow-scripts "$@"
+    ;;
+  run)
+    shift
+    exec "$DENO" task "$@"
+    ;;
+  exec|x)
+    shift
+    exec "$DENO" run -A "npm:$@"
+    ;;
+  *)
+    exec "$DENO" install --node-modules-dir=auto --allow-scripts "$@"
+    ;;
+esac

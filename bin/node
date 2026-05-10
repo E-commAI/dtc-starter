@@ -1,0 +1,12 @@
+#!/bin/sh
+# Shim: delegates `node` calls to Deno in Node compat mode.
+# Resolves: repo-local ./deno first, then system deno.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -x "$REPO_ROOT/deno" ]; then
+  DENO="$REPO_ROOT/deno"
+else
+  DENO="deno"
+fi
+
+exec "$DENO" run -A "$@"
