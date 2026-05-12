@@ -10,8 +10,7 @@
     "lint": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo lint",
     "test": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo test",
     "backend:seed": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo seed --filter=@dtc/backend",
-    "backend:dev": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo dev --filter=@dtc/backend",
-    "storefront:dev": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo dev --filter=@dtc/storefront"
+    "backend:dev": "PATH=$(pwd)/bin:$PATH deno run -A npm:turbo dev --filter=@dtc/backend"  
   },
   "pnpm": {
     "overrides": {
