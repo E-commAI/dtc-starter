@@ -8,11 +8,11 @@
     "medusa-storefront"
   ],
   "scripts": {
-    "dev": "next dev --turbopack -p 8000",
-    "build": "next build",
-    "start": "next start -p 8000",
-    "lint": "next lint",
-    "analyze": "ANALYZE=true next build"
+    "dev": "../../bin/deno run --unstable-detect-cjs -A npm:next dev --turbopack -p 8000",
+    "build": "../../bin/deno run --unstable-detect-cjs -A npm:next build",
+    "start": "../../bin/deno run --unstable-detect-cjs -A npm:next start -p 8000",
+    "lint": "../../bin/deno run --unstable-detect-cjs -A npm:next lint",
+    "analyze": "ANALYZE=true ../../bin/deno run --unstable-detect-cjs -A npm:next build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
