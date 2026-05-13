@@ -110,14 +110,15 @@ export default async function initial_data_seed({
   const region = regionResult[0];
   logger.info("Finished seeding regions.");
 
-  logger.info("Seeding tax regions...");
-  await taxModuleService.createTaxRegions_(
-    countries.map((country_code) => ({
-      country_code,
-      provider_id: "tp_system",
-    }))
-  );
-  logger.info("Finished seeding tax regions.");
+  //TODO: this hangs the setup.sh seeding
+  // logger.info("Seeding tax regions...");
+  // await taxModuleService.createTaxRegions_(
+  //   countries.map((country_code) => ({
+  //     country_code,
+  //     provider_id: "tp_system",
+  //   }))
+  // );
+  // logger.info("Finished seeding tax regions.");
 
   logger.info("Seeding stock location data...");
   const { result: stockLocationResult } = await createStockLocationsWorkflow(
