@@ -11,6 +11,9 @@ BIN_DIR="$REPO_ROOT/bin"
 BACKEND_DIR="$REPO_ROOT/apps/backend"
 BACKEND_ENV_TEMPLATE="$BACKEND_DIR/.env.template"
 BACKEND_ENV_FILE="$BACKEND_DIR/.env"
+STOREFRONT_DIR="$REPO_ROOT/apps/storefront"
+STOREFRONT_ENV_TEMPLATE="$STOREFRONT_DIR/.env.template"
+STOREFRONT_ENV_FILE="$STOREFRONT_DIR/.env.local"
 PGLITE_HOST="${PGHOST:-127.0.0.1}"
 PGLITE_PORT="${PGPORT:-5444}"
 PGLITE_USERNAME="postgres"
@@ -61,6 +64,16 @@ ensure_backend_env() {
 
   echo "🧩 Creating backend environment file..."
   cp "$BACKEND_ENV_TEMPLATE" "$BACKEND_ENV_FILE"
+}
+
+ensure_storefront_env() {
+  if [ -f "$STOREFRONT_ENV_FILE" ]; then
+    echo "🧩 Reusing existing storefront environment file..."
+    return
+  fi
+
+  echo "🧩 Creating storefront environment file..."
+  cp "$STOREFRONT_ENV_TEMPLATE" "$STOREFRONT_ENV_FILE"
 }
 
 cleanup() {
@@ -129,6 +142,7 @@ echo ""
 
 # --- Set up backend environment ---
 ensure_backend_env
+ensure_storefront_env
 
 DATABASE_URL="$(get_env_value "$BACKEND_ENV_FILE" "DATABASE_URL")"
 USE_PGLITE=0
@@ -170,6 +184,10 @@ echo "🛠️ Running backend migrations..."
 )
 echo ""
 
+echo "🔑 Syncing storefront publishable API key..."
+PATH="$BIN_DIR:$PATH" DATABASE_URL="$DATABASE_URL" STOREFRONT_ENV_FILE="$STOREFRONT_ENV_FILE" "$DENO" run --allow-env --allow-net --allow-read --allow-write --allow-sys "$BACKEND_DIR/scripts/sync-storefront-publishable-key.ts"
+echo ""
+
 # --- Print usage instructions ---
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║  ✅ Setup complete!                                     ║"
@@ -179,6 +197,10 @@ echo "Run any of these commands from the repo root:"
 echo ""
 echo '  cd apps/backend && PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli user -e admin@test.com -p supersecret'
 echo "  # Create an admin user"
+echo ""
+echo "The storefront env file is already created at apps/storefront/.env.local."
+echo "NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY is already set from the default publishable API key."
+echo "Update it manually only if you want to use a different key."
 echo ""
 echo "  deno task dev              # Start all apps"
 echo "  deno task backend:dev      # Start backend only"

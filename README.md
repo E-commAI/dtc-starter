@@ -109,17 +109,9 @@ deno task backend:dev
 
 5. Open the admin dashboard at `localhost:9000/app` and log in. Retrieve your publishable API key at Settings > Publishable API key.
 
-6. Set up environment variables for the storefront:
+6. `setup.sh` also creates `apps/storefront/.env.local` from the storefront template and sets `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` from the seeded default publishable API key.
 
-```bash
-cp apps/storefront/.env.template apps/storefront/.env.local
-```
-
-7. Update `apps/storefront/.env.local` with your Medusa publishable API key:
-
-```bash
-NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_6c3...
-```
+7. If you want to use a different publishable API key, update `apps/storefront/.env.local`.
 
 8. Start storefront:
 
