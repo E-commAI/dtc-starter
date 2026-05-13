@@ -195,7 +195,7 @@ echo "╚═══════════════════════�
 echo ""
 echo "Run any of these commands from the repo root:"
 echo ""
-echo '  cd apps/backend && PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli user -e admin@test.com -p supersecret'
+echo '  cd apps/backend && PATH=$(pwd)/../../bin:$PATH deno run --allow-all scripts/run-medusa-cli-with-db.ts user -e admin@test.com -p supersecret'
 echo "  # Create an admin user"
 echo ""
 echo "The storefront env file is already created at apps/storefront/.env.local."

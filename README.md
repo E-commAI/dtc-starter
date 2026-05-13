@@ -98,7 +98,7 @@ PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli db:migrate
 
 ```bash
 cd apps/backend
-PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli user -e admin@test.com -p supersecret
+PATH=$(pwd)/../../bin:$PATH deno run --allow-all scripts/run-medusa-cli-with-db.ts user -e admin@test.com -p supersecret
 ```
 
 4. Start Medusa backend:
