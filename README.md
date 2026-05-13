@@ -65,8 +65,8 @@ The fastest way to get started is deploying with [Medusa Cloud](https://cloud.me
 
 > **Prerequisites:**
 >
-> - [PostgreSQL](https://www.postgresql.org/) v15+
 > - [Deno](https://deno.com/) — either bundled in the repo root as `./deno`, or installed on your system. **No Node.js or npm required.**
+> - [PostgreSQL](https://www.postgresql.org/) v15+ only if you want to replace the default local PGlite database with an external PostgreSQL instance.
 
 1. Clone the repository and run the setup script:
 
@@ -78,54 +78,50 @@ cd dtc-starter
 
 This installs all npm dependencies using Deno. It uses `./deno` if present in the repo, otherwise your system `deno`.
 
-2. Set up environment variables for the backend:
+It also creates `apps/backend/.env` if it does not exist, seeds the default local PGlite connection string, and runs backend migrations automatically.
+
+2. Review the backend database URL in `apps/backend/.env`:
 
 ```bash
-cp apps/backend/.env.template apps/backend/.env
+# Default local PGlite database used by setup.sh
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5444/postgres
 ```
 
-3. Set the database URL in `apps/backend/.env`:
-
-```bash
-# Replace with actual database URL, make sure the database exists.
-DATABASE_URL=postgres://postgres:@localhost:5432/medusa-dtc-starter
-```
-
-4. Run migrations:
+If you prefer to use your own PostgreSQL instance instead, update `DATABASE_URL` and rerun migrations:
 
 ```bash
 cd apps/backend
-PATH=$(pwd)/../../bin:$PATH deno run -A npm:medusa db:migrate
+PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli db:migrate
 ```
 
-5. Add admin user:
+3. Add admin user:
 
 ```bash
 cd apps/backend
-PATH=$(pwd)/../../bin:$PATH deno run -A npm:medusa user -e admin@test.com -p supersecret
+PATH=$(pwd)/../../bin:$PATH deno run -A npm:@medusajs/cli user -e admin@test.com -p supersecret
 ```
 
-6. Start Medusa backend:
+4. Start Medusa backend:
 
 ```bash
 deno task backend:dev
 ```
 
-7. Open the admin dashboard at `localhost:9000/app` and log in. Retrieve your publishable API key at Settings > Publishable API key.
+5. Open the admin dashboard at `localhost:9000/app` and log in. Retrieve your publishable API key at Settings > Publishable API key.
 
-8. Set up environment variables for the storefront:
+6. Set up environment variables for the storefront:
 
 ```bash
 cp apps/storefront/.env.template apps/storefront/.env.local
 ```
 
-9. Update `apps/storefront/.env.local` with your Medusa publishable API key:
+7. Update `apps/storefront/.env.local` with your Medusa publishable API key:
 
 ```bash
 NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_6c3...
 ```
 
-10.  Start storefront:
+8. Start storefront:
 
 ```bash
 deno task storefront:dev

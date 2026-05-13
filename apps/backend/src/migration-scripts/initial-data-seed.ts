@@ -17,7 +17,6 @@ import {
   createShippingProfilesWorkflow,
   createStockLocationsWorkflow,
   createStoresWorkflow,
-  createTaxRegionsWorkflow,
   linkSalesChannelsToApiKeyWorkflow,
   linkSalesChannelsToStockLocationWorkflow,
 } from "@medusajs/medusa/core-flows";
@@ -33,6 +32,7 @@ export default async function initial_data_seed({
   const fulfillmentModuleService = container.resolve(
     ModuleRegistrationName.FULFILLMENT
   );
+  const taxModuleService = container.resolve(Modules.TAX) as any;
 
   const countries = ["gb", "de", "dk", "se", "fr", "es", "it"];
 
@@ -111,12 +111,12 @@ export default async function initial_data_seed({
   logger.info("Finished seeding regions.");
 
   logger.info("Seeding tax regions...");
-  await createTaxRegionsWorkflow(container).run({
-    input: countries.map((country_code) => ({
+  await taxModuleService.createTaxRegions_(
+    countries.map((country_code) => ({
       country_code,
       provider_id: "tp_system",
-    })),
-  });
+    }))
+  );
   logger.info("Finished seeding tax regions.");
 
   logger.info("Seeding stock location data...");
