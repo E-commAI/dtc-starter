@@ -130,6 +130,29 @@ echo "✅ Using: $DENO_VERSION"
 echo "   Path:  $DENO"
 echo ""
 
+# --- Clear Deno compilation cache, Next.js storefront cache, and Medusa Admin cache ---
+echo "🧹 Clearing Deno, storefront, and admin build/compilation caches..."
+# Clear Next.js cache
+if [ -d "$STOREFRONT_DIR/.next" ]; then
+  rm -rf "$STOREFRONT_DIR/.next"
+fi
+
+# Clear Medusa Admin build caches
+if [ -d "$BACKEND_DIR/.medusa/server" ]; then
+  rm -rf "$BACKEND_DIR/.medusa/server"
+fi
+if [ -d "$BACKEND_DIR/.medusa/admin" ]; then
+  rm -rf "$BACKEND_DIR/.medusa/admin"
+fi
+
+# Clear Deno typescript compiler cache (avoiding re-downloading remote dependencies)
+DENO_GEN_DIR="$("$DENO" info 2>/dev/null | grep "Emitted modules cache" | cut -d: -f2- | xargs 2>/dev/null || true)"
+if [ -n "$DENO_GEN_DIR" ] && [ -d "$DENO_GEN_DIR" ]; then
+  rm -rf "$DENO_GEN_DIR"
+fi
+echo "✅ Caches cleared successfully."
+echo ""
+
 # --- Ensure shim scripts are executable ---
 echo "🔧 Setting up bin/ shims (deno, node, npm, npx)..."
 chmod +x "$BIN_DIR/deno" "$BIN_DIR/node" "$BIN_DIR/npm" "$BIN_DIR/npx"
