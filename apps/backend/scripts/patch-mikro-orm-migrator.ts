@@ -156,6 +156,24 @@ const LINK_LOCK_PATCHED_SNIPPET = `                    const runAction = async (
                         }
                     }`;
 
+const CUSTOM_DB_MIGRATOR_ORIGINAL_SNIPPET = `                instance.up = async function (...args) {
+                    await this.driver.execute(\`SET LOCAL search_path TO \${customSchema}\`);
+                    return up.bind(this)(...args);
+                };
+                instance.down = async function (...args) {
+                    await this.driver.execute(\`SET LOCAL search_path TO \${customSchema}\`);
+                    return down.bind(this)(...args);
+                };`;
+
+const CUSTOM_DB_MIGRATOR_PATCHED_SNIPPET = `                instance.up = async function (...args) {
+                    await this.execute(\`SET LOCAL search_path TO \${customSchema}\`);
+                    return up.bind(this)(...args);
+                };
+                instance.down = async function (...args) {
+                    await this.execute(\`SET LOCAL search_path TO \${customSchema}\`);
+                    return down.bind(this)(...args);
+                };`;
+
 const PATCH_TARGETS = [
   {
       label: "MikroORM migrator copies",
@@ -168,6 +186,12 @@ const PATCH_TARGETS = [
       relativePath: "node_modules/@medusajs/modules-sdk/dist/medusa-app.js",
       originalSnippet: MODULE_LOCK_ORIGINAL_SNIPPET,
       patchedSnippet: MODULE_LOCK_PATCHED_SNIPPET,
+  },
+  {
+      label: "Medusa custom DB migrator search_path wrappers",
+      relativePath: "node_modules/@medusajs/utils/dist/dal/mikro-orm/custom-db-migrator.js",
+      originalSnippet: CUSTOM_DB_MIGRATOR_ORIGINAL_SNIPPET,
+      patchedSnippet: CUSTOM_DB_MIGRATOR_PATCHED_SNIPPET,
   },
   {
       label: "Link sync lock wrappers",
