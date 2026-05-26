@@ -1,27 +1,24 @@
-import { listCategories } from "@lib/data/categories";
-import { listCollections } from "@lib/data/collections";
-import { Text, clx } from "@modules/common/components/ui";
+import { shopBrand } from "@lib/branding"
+import { listCategories } from "@lib/data/categories"
+import { listCollections } from "@lib/data/collections"
+import { clx, Text } from "@modules/common/components/ui"
 
-import LocalizedClientLink from "@modules/common/components/localized-client-link";
-import MedusaCTA from "@modules/layout/components/medusa-cta";
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import MedusaCTA from "@modules/layout/components/medusa-cta"
+import StoreBrandLink from "@modules/layout/components/store-brand-link"
 
 export default async function Footer() {
   const { collections } = await listCollections({
     fields: "*products",
-  });
-  const productCategories = await listCategories();
+  })
+  const productCategories = await listCategories()
 
   return (
     <footer className="border-t border-ui-border-base w-full">
       <div className="content-container flex flex-col w-full">
         <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
           <div>
-            <LocalizedClientLink
-              href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
-            >
-              Medusa Store
-            </LocalizedClientLink>
+            <StoreBrandLink className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase" />
           </div>
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
             {productCategories && productCategories?.length > 0 && (
@@ -35,7 +32,7 @@ export default async function Footer() {
                 >
                   {productCategories?.slice(0, 6).map((c) => {
                     if (c.parent_category) {
-                      return;
+                      return
                     }
 
                     const children =
@@ -43,7 +40,7 @@ export default async function Footer() {
                         name: child.name,
                         handle: child.handle,
                         id: child.id,
-                      })) || null;
+                      })) || null
 
                     return (
                       <li
@@ -77,7 +74,7 @@ export default async function Footer() {
                           </ul>
                         )}
                       </li>
-                    );
+                    )
                   })}
                 </ul>
               </div>
@@ -147,11 +144,11 @@ export default async function Footer() {
         </div>
         <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
           <Text className="txt-compact-small">
-            © {new Date().getFullYear()} Medusa Store. All rights reserved.
+            © {new Date().getFullYear()} {shopBrand.name}. All rights reserved.
           </Text>
           <MedusaCTA />
         </div>
       </div>
     </footer>
-  );
+  )
 }

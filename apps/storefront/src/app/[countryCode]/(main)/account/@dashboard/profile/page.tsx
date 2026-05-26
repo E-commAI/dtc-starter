@@ -5,12 +5,13 @@ import ProfileBillingAddress from "@modules/account/components/profile-billing-a
 import ProfileEmail from "@modules/account/components/profile-email"
 import ProfileName from "@modules/account/components/profile-name"
 import { notFound } from "next/navigation"
+import { shopBrand } from "@lib/branding"
 import { listRegions } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
 
 export const metadata: Metadata = {
   title: "Profile",
-  description: "View and edit your Medusa Store profile.",
+  description: `View and edit your ${shopBrand.name} profile.`,
 }
 
 export default async function Profile() {

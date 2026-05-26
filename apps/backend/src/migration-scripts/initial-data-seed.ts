@@ -21,6 +21,219 @@ import {
   linkSalesChannelsToStockLocationWorkflow,
 } from "@medusajs/medusa/core-flows";
 
+type MarketId = "us" | "uk" | "eu" | "ca" | "au";
+
+type ShopMarket = {
+  name: string;
+  languageCode: string;
+  currencyCode: string;
+  cookieRegion: string;
+  notes: string;
+};
+
+type MarketSeeder = {
+  market: ShopMarket;
+  countries: string[];
+  warehouse: {
+    name: string;
+    city: string;
+    countryCode: string;
+  };
+  productAmount: number;
+  shippingAmount: number;
+};
+
+type SelectedMarketSeeder = MarketSeeder & {
+  id: MarketId;
+};
+
+const DEFAULT_MARKET_ID: MarketId = "eu";
+
+const MARKET_SEEDERS: Record<MarketId, MarketSeeder> = {
+  us: {
+    market: {
+      name: "United States",
+      languageCode: "en-US",
+      currencyCode: "USD",
+      cookieRegion: "CCPA",
+      notes: "English storefront, US dollar pricing.",
+    },
+    countries: ["us"],
+    warehouse: {
+      name: "United States Warehouse",
+      city: "New York",
+      countryCode: "US",
+    },
+    productAmount: 15,
+    shippingAmount: 10,
+  },
+  uk: {
+    market: {
+      name: "United Kingdom",
+      languageCode: "en-GB",
+      currencyCode: "GBP",
+      cookieRegion: "UK GDPR",
+      notes: "British English, pound sterling.",
+    },
+    countries: ["gb"],
+    warehouse: {
+      name: "United Kingdom Warehouse",
+      city: "London",
+      countryCode: "GB",
+    },
+    productAmount: 12,
+    shippingAmount: 8,
+  },
+  eu: {
+    market: {
+      name: "European Union",
+      languageCode: "en-EU",
+      currencyCode: "EUR",
+      cookieRegion: "EU GDPR",
+      notes: "Euro pricing, stronger consent.",
+    },
+    countries: [
+      "at",
+      "be",
+      "bg",
+      "hr",
+      "cy",
+      "cz",
+      "dk",
+      "ee",
+      "fi",
+      "fr",
+      "de",
+      "gr",
+      "hu",
+      "ie",
+      "it",
+      "lv",
+      "lt",
+      "lu",
+      "mt",
+      "nl",
+      "pl",
+      "pt",
+      "ro",
+      "sk",
+      "si",
+      "es",
+      "se",
+    ],
+    warehouse: {
+      name: "European Union Warehouse",
+      city: "Berlin",
+      countryCode: "DE",
+    },
+    productAmount: 10,
+    shippingAmount: 10,
+  },
+  ca: {
+    market: {
+      name: "Canada",
+      languageCode: "en-CA",
+      currencyCode: "CAD",
+      cookieRegion: "PIPEDA",
+      notes: "Canadian defaults, bilingual room.",
+    },
+    countries: ["ca"],
+    warehouse: {
+      name: "Canada Warehouse",
+      city: "Toronto",
+      countryCode: "CA",
+    },
+    productAmount: 20,
+    shippingAmount: 14,
+  },
+  au: {
+    market: {
+      name: "Australia",
+      languageCode: "en-AU",
+      currencyCode: "AUD",
+      cookieRegion: "AU Privacy Act",
+      notes: "Australian storefront defaults.",
+    },
+    countries: ["au"],
+    warehouse: {
+      name: "Australia Warehouse",
+      city: "Sydney",
+      countryCode: "AU",
+    },
+    productAmount: 22,
+    shippingAmount: 15,
+  },
+};
+
+const getMarketSeeders = (): SelectedMarketSeeder[] => {
+  const requestedMarkets = (
+    process.env.SEED_MARKETS ||
+    process.env.SEED_MARKET ||
+    process.env.MARKETS ||
+    process.env.MARKET ||
+    DEFAULT_MARKET_ID
+  )
+    .split(",")
+    .map((market) => market.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!requestedMarkets.length) {
+    throw new Error(
+      `No markets provided. Expected one or more of: ${
+        Object.keys(
+          MARKET_SEEDERS,
+        ).join(", ")
+      }.`,
+    );
+  }
+
+  const marketIds = requestedMarkets.reduce<MarketId[]>((ids, market) => {
+    if (!(market in MARKET_SEEDERS)) {
+      throw new Error(
+        `Unsupported market "${market}". Expected one of: ${
+          Object.keys(
+            MARKET_SEEDERS,
+          ).join(", ")
+        }.`,
+      );
+    }
+
+    const id = market as MarketId;
+
+    if (!ids.includes(id)) {
+      ids.push(id);
+    }
+
+    return ids;
+  }, []);
+
+  return marketIds.map((id) => ({
+    id,
+    ...MARKET_SEEDERS[id],
+  }));
+};
+
+const getShopName = (primaryMarketSeeder: SelectedMarketSeeder) => {
+  return (
+    process.env.SEED_SHOP_NAME ||
+    process.env.SHOP_NAME ||
+    `${primaryMarketSeeder.market.name} Store`
+  );
+};
+
+const getMarketMetadata = (marketSeeder: SelectedMarketSeeder) => {
+  const market = marketSeeder.market;
+
+  return {
+    market_id: marketSeeder.id,
+    market_name: market.name,
+    language_code: market.languageCode,
+    currency_code: market.currencyCode,
+    cookie_region: market.cookieRegion,
+    notes: market.notes,
+  };
+};
+
 export default async function initial_data_seed({
   container,
 }: {
@@ -30,11 +243,45 @@ export default async function initial_data_seed({
   const link = container.resolve(ContainerRegistrationKeys.LINK);
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
   const fulfillmentModuleService = container.resolve(
-    ModuleRegistrationName.FULFILLMENT
+    ModuleRegistrationName.FULFILLMENT,
   );
   const taxModuleService = container.resolve(Modules.TAX) as any;
 
-  const countries = ["gb", "de", "dk", "se", "fr", "es", "it"];
+  const marketSeeders = getMarketSeeders();
+  const primaryMarketSeeder = marketSeeders[0];
+  const shopName = getShopName(primaryMarketSeeder);
+  const marketsMetadata = marketSeeders.map((marketSeeder) =>
+    getMarketMetadata(marketSeeder)
+  );
+  const productPrices = marketSeeders.reduce<
+    { amount: number; currency_code: string }[]
+  >((prices, marketSeeder) => {
+    const currencyCode = marketSeeder.market.currencyCode.toLowerCase();
+
+    if (!prices.some((price) => price.currency_code === currencyCode)) {
+      prices.push({
+        amount: marketSeeder.productAmount,
+        currency_code: currencyCode,
+      });
+    }
+
+    return prices;
+  }, []);
+  const variantPrices = () =>
+    productPrices.map((price) => ({
+      ...price,
+    }));
+
+  logger.info(
+    `Using market seeders: ${
+      marketSeeders
+        .map(
+          (marketSeeder) =>
+            `${marketSeeder.id} (${marketSeeder.market.currencyCode})`,
+        )
+        .join(", ")
+    }. Shop name: ${shopName}.`,
+  );
 
   logger.info("Seeding store data...");
   const {
@@ -71,49 +318,50 @@ export default async function initial_data_seed({
     },
   });
 
-  const {
-    result: [store],
-  } = await createStoresWorkflow(container).run({
+  await createStoresWorkflow(container).run({
     input: {
       stores: [
         {
-          name: "Default Store",
-          supported_currencies: [
-            {
-              currency_code: "eur",
-              is_default: true,
-            },
-            {
-              currency_code: "usd",
-              is_default: false,
-            },
-          ],
+          name: shopName,
+          supported_currencies: productPrices.map((price, index) => ({
+            currency_code: price.currency_code,
+            is_default: index === 0,
+          })),
           default_sales_channel_id: defaultSalesChannel.id,
+          metadata: {
+            shop_name: shopName,
+            market_ids: marketSeeders.map((marketSeeder) => marketSeeder.id),
+            markets: marketsMetadata,
+          },
         },
       ],
     },
   });
 
   logger.info("Seeding region data...");
-  const { result: regionResult } = await createRegionsWorkflow(container).run({
+  const { result: regions } = await createRegionsWorkflow(container).run({
     input: {
-      regions: [
-        {
-          name: "Europe",
-          currency_code: "eur",
-          countries,
-          payment_providers: ["pp_system_default"],
-        },
-      ],
+      regions: marketSeeders.map((marketSeeder) => ({
+        name: marketSeeder.market.name,
+        currency_code: marketSeeder.market.currencyCode.toLowerCase(),
+        countries: marketSeeder.countries,
+        payment_providers: ["pp_system_default"],
+        metadata: getMarketMetadata(marketSeeder),
+      })),
     },
   });
-  const region = regionResult[0];
+  const regionsByMarketId = new Map(
+    marketSeeders.map((marketSeeder, index) => [
+      marketSeeder.id,
+      regions[index],
+    ]),
+  );
   logger.info("Finished seeding regions.");
 
   //TODO: this hangs the setup.sh seeding
   // logger.info("Seeding tax regions...");
   // await taxModuleService.createTaxRegions_(
-  //   countries.map((country_code) => ({
+  //   marketSeeders.flatMap((marketSeeder) => marketSeeder.countries).map((country_code) => ({
   //     country_code,
   //     provider_id: "tp_system",
   //   }))
@@ -122,31 +370,36 @@ export default async function initial_data_seed({
 
   logger.info("Seeding stock location data...");
   const { result: stockLocationResult } = await createStockLocationsWorkflow(
-    container
+    container,
   ).run({
     input: {
-      locations: [
-        {
-          name: "European Warehouse",
-          address: {
-            city: "Copenhagen",
-            country_code: "DK",
-            address_1: "",
-          },
+      locations: marketSeeders.map((marketSeeder) => ({
+        name: marketSeeder.warehouse.name,
+        address: {
+          city: marketSeeder.warehouse.city,
+          country_code: marketSeeder.warehouse.countryCode,
+          address_1: "",
         },
-      ],
+      })),
     },
   });
-  const stockLocation = stockLocationResult[0];
+  const stockLocationsByMarketId = new Map(
+    marketSeeders.map((marketSeeder, index) => [
+      marketSeeder.id,
+      stockLocationResult[index],
+    ]),
+  );
 
-  await link.create({
-    [Modules.STOCK_LOCATION]: {
-      stock_location_id: stockLocation.id,
-    },
-    [Modules.FULFILLMENT]: {
-      fulfillment_provider_id: "manual_manual",
-    },
-  });
+  for (const stockLocation of stockLocationResult) {
+    await link.create({
+      [Modules.STOCK_LOCATION]: {
+        stock_location_id: stockLocation.id,
+      },
+      [Modules.FULFILLMENT]: {
+        fulfillment_provider_id: "manual_manual",
+      },
+    });
+  }
 
   logger.info("Seeding fulfillment data...");
   // This is created by a migration script in core.
@@ -156,149 +409,126 @@ export default async function initial_data_seed({
   });
   const shippingProfile = shippingProfileResult[0];
 
-  const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
-    name: "European Warehouse delivery",
-    type: "shipping",
-    service_zones: [
-      {
-        name: "Europe",
-        geo_zones: [
-          {
-            country_code: "gb",
-            type: "country",
-          },
-          {
-            country_code: "de",
-            type: "country",
-          },
-          {
-            country_code: "dk",
-            type: "country",
-          },
-          {
-            country_code: "se",
-            type: "country",
-          },
-          {
-            country_code: "fr",
-            type: "country",
-          },
-          {
-            country_code: "es",
-            type: "country",
-          },
-          {
-            country_code: "it",
-            type: "country",
-          },
-        ],
-      },
-    ],
-  });
+  for (const marketSeeder of marketSeeders) {
+    const market = marketSeeder.market;
+    const countries = marketSeeder.countries;
+    const currencyCode = market.currencyCode.toLowerCase();
+    const region = regionsByMarketId.get(marketSeeder.id)!;
+    const stockLocation = stockLocationsByMarketId.get(marketSeeder.id)!;
 
-  await link.create({
-    [Modules.STOCK_LOCATION]: {
-      stock_location_id: stockLocation.id,
-    },
-    [Modules.FULFILLMENT]: {
-      fulfillment_set_id: fulfillmentSet.id,
-    },
-  });
+    const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets(
+      {
+        name: `${marketSeeder.warehouse.name} delivery`,
+        type: "shipping",
+        service_zones: [
+          {
+            name: market.name,
+            geo_zones: countries.map((country_code) => ({
+              country_code,
+              type: "country" as const,
+            })),
+          },
+        ],
+      },
+    );
 
-  await createShippingOptionsWorkflow(container).run({
-    input: [
-      {
-        name: "Standard Shipping",
-        price_type: "flat",
-        provider_id: "manual_manual",
-        service_zone_id: fulfillmentSet.service_zones[0].id,
-        shipping_profile_id: shippingProfile.id,
-        type: {
-          label: "Standard",
-          description: "Ship in 2-3 days.",
-          code: "standard",
-        },
-        prices: [
-          {
-            currency_code: "usd",
-            amount: 10,
-          },
-          {
-            currency_code: "eur",
-            amount: 10,
-          },
-          {
-            region_id: region.id,
-            amount: 10,
-          },
-        ],
-        rules: [
-          {
-            attribute: "enabled_in_store",
-            value: "true",
-            operator: "eq",
-          },
-          {
-            attribute: "is_return",
-            value: "false",
-            operator: "eq",
-          },
-        ],
+    await link.create({
+      [Modules.STOCK_LOCATION]: {
+        stock_location_id: stockLocation.id,
       },
-      {
-        name: "Express Shipping",
-        price_type: "flat",
-        provider_id: "manual_manual",
-        service_zone_id: fulfillmentSet.service_zones[0].id,
-        shipping_profile_id: shippingProfile.id,
-        type: {
-          label: "Express",
-          description: "Ship in 24 hours.",
-          code: "express",
-        },
-        prices: [
-          {
-            currency_code: "usd",
-            amount: 10,
-          },
-          {
-            currency_code: "eur",
-            amount: 10,
-          },
-          {
-            region_id: region.id,
-            amount: 10,
-          },
-        ],
-        rules: [
-          {
-            attribute: "enabled_in_store",
-            value: "true",
-            operator: "eq",
-          },
-          {
-            attribute: "is_return",
-            value: "false",
-            operator: "eq",
-          },
-        ],
+      [Modules.FULFILLMENT]: {
+        fulfillment_set_id: fulfillmentSet.id,
       },
-    ],
-  });
+    });
+
+    await createShippingOptionsWorkflow(container).run({
+      input: [
+        {
+          name: "Standard Shipping",
+          price_type: "flat",
+          provider_id: "manual_manual",
+          service_zone_id: fulfillmentSet.service_zones[0].id,
+          shipping_profile_id: shippingProfile.id,
+          type: {
+            label: "Standard",
+            description: "Ship in 2-3 days.",
+            code: "standard",
+          },
+          prices: [
+            {
+              currency_code: currencyCode,
+              amount: marketSeeder.shippingAmount,
+            },
+            {
+              region_id: region.id,
+              amount: marketSeeder.shippingAmount,
+            },
+          ],
+          rules: [
+            {
+              attribute: "enabled_in_store",
+              value: "true",
+              operator: "eq",
+            },
+            {
+              attribute: "is_return",
+              value: "false",
+              operator: "eq",
+            },
+          ],
+        },
+        {
+          name: "Express Shipping",
+          price_type: "flat",
+          provider_id: "manual_manual",
+          service_zone_id: fulfillmentSet.service_zones[0].id,
+          shipping_profile_id: shippingProfile.id,
+          type: {
+            label: "Express",
+            description: "Ship in 24 hours.",
+            code: "express",
+          },
+          prices: [
+            {
+              currency_code: currencyCode,
+              amount: marketSeeder.shippingAmount,
+            },
+            {
+              region_id: region.id,
+              amount: marketSeeder.shippingAmount,
+            },
+          ],
+          rules: [
+            {
+              attribute: "enabled_in_store",
+              value: "true",
+              operator: "eq",
+            },
+            {
+              attribute: "is_return",
+              value: "false",
+              operator: "eq",
+            },
+          ],
+        },
+      ],
+    });
+
+    await linkSalesChannelsToStockLocationWorkflow(container).run({
+      input: {
+        id: stockLocation.id,
+        add: [defaultSalesChannel.id],
+      },
+    });
+  }
+
   logger.info("Finished seeding fulfillment data.");
-
-  await linkSalesChannelsToStockLocationWorkflow(container).run({
-    input: {
-      id: stockLocation.id,
-      add: [defaultSalesChannel.id],
-    },
-  });
   logger.info("Finished seeding stock location data.");
 
   logger.info("Seeding product data...");
 
   const { result: categoryResult } = await createProductCategoriesWorkflow(
-    container
+    container,
   ).run({
     input: {
       product_categories: [
@@ -338,16 +568,20 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-front.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-front.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-back.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-back.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-front.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-front.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-back.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-back.png",
             },
           ],
           options: [
@@ -368,16 +602,7 @@ export default async function initial_data_seed({
                 Size: "S",
                 Color: "Black",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "S / White",
@@ -386,16 +611,7 @@ export default async function initial_data_seed({
                 Size: "S",
                 Color: "White",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "M / Black",
@@ -404,16 +620,7 @@ export default async function initial_data_seed({
                 Size: "M",
                 Color: "Black",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "M / White",
@@ -422,16 +629,7 @@ export default async function initial_data_seed({
                 Size: "M",
                 Color: "White",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "L / Black",
@@ -440,16 +638,7 @@ export default async function initial_data_seed({
                 Size: "L",
                 Color: "Black",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "L / White",
@@ -458,16 +647,7 @@ export default async function initial_data_seed({
                 Size: "L",
                 Color: "White",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "XL / Black",
@@ -476,16 +656,7 @@ export default async function initial_data_seed({
                 Size: "XL",
                 Color: "Black",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "XL / White",
@@ -494,16 +665,7 @@ export default async function initial_data_seed({
                 Size: "XL",
                 Color: "White",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
           ],
           sales_channels: [
@@ -525,10 +687,12 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-front.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-front.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-back.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-back.png",
             },
           ],
           options: [
@@ -544,16 +708,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "S",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "M",
@@ -561,16 +716,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "M",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "L",
@@ -578,16 +724,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "L",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "XL",
@@ -595,16 +732,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "XL",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
           ],
           sales_channels: [
@@ -626,10 +754,12 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-back.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-back.png",
             },
           ],
           options: [
@@ -645,16 +775,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "S",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "M",
@@ -662,16 +783,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "M",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "L",
@@ -679,16 +791,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "L",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "XL",
@@ -696,16 +799,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "XL",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
           ],
           sales_channels: [
@@ -727,10 +821,12 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-front.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-front.png",
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-back.png",
+              url:
+                "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-back.png",
             },
           ],
           options: [
@@ -746,16 +842,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "S",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "M",
@@ -763,16 +850,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "M",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "L",
@@ -780,16 +858,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "L",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
             {
               title: "XL",
@@ -797,16 +866,7 @@ export default async function initial_data_seed({
               options: {
                 Size: "XL",
               },
-              prices: [
-                {
-                  amount: 10,
-                  currency_code: "eur",
-                },
-                {
-                  amount: 15,
-                  currency_code: "usd",
-                },
-              ],
+              prices: variantPrices(),
             },
           ],
           sales_channels: [
@@ -829,11 +889,13 @@ export default async function initial_data_seed({
 
   await createInventoryLevelsWorkflow(container).run({
     input: {
-      inventory_levels: inventoryItems.map((item) => ({
-        location_id: stockLocation.id,
-        stocked_quantity: 1000000,
-        inventory_item_id: item.id,
-      })),
+      inventory_levels: inventoryItems.flatMap((item) =>
+        stockLocationResult.map((stockLocation) => ({
+          location_id: stockLocation.id,
+          stocked_quantity: 1000000,
+          inventory_item_id: item.id,
+        }))
+      ),
     },
   });
 
