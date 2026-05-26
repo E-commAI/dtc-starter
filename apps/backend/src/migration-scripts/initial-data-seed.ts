@@ -47,6 +47,14 @@ type SelectedMarketSeeder = MarketSeeder & {
   id: MarketId;
 };
 
+type SeedRegion = {
+  id: string;
+  metadata?: Record<string, unknown> | null;
+  countries?: {
+    iso_2?: string | null;
+  }[];
+};
+
 const DEFAULT_MARKET_ID: MarketId = "eu";
 
 const MARKET_SEEDERS: Record<MarketId, MarketSeeder> = {
@@ -339,23 +347,62 @@ export default async function initial_data_seed({
   });
 
   logger.info("Seeding region data...");
-  const { result: regions } = await createRegionsWorkflow(container).run({
-    input: {
-      regions: marketSeeders.map((marketSeeder) => ({
-        name: marketSeeder.market.name,
-        currency_code: marketSeeder.market.currencyCode.toLowerCase(),
-        countries: marketSeeder.countries,
-        payment_providers: ["pp_system_default"],
-        metadata: getMarketMetadata(marketSeeder),
-      })),
-    },
-  });
-  const regionsByMarketId = new Map(
-    marketSeeders.map((marketSeeder, index) => [
-      marketSeeder.id,
-      regions[index],
-    ]),
-  );
+  const regionsByMarketId = new Map<MarketId, SeedRegion>();
+  const marketSeedersToCreate: SelectedMarketSeeder[] = [];
+
+  for (const marketSeeder of marketSeeders) {
+    const { data: existingCountries } = await query.graph({
+      entity: "country",
+      fields: ["iso_2", "region_id"],
+      filters: {
+        iso_2: marketSeeder.countries,
+      },
+    });
+    const existingRegionIds = [
+      ...new Set(
+        existingCountries
+          .map((country: { region_id?: string | null }) => country.region_id)
+          .filter((regionId: string | null | undefined): regionId is string =>
+            !!regionId
+          ),
+      ),
+    ];
+
+    if (existingRegionIds.length > 1) {
+      throw new Error(
+        `Market ${marketSeeder.id} already has countries assigned across multiple regions.`,
+      );
+    }
+
+    if (existingRegionIds.length === 1) {
+      regionsByMarketId.set(marketSeeder.id, { id: existingRegionIds[0] });
+      logger.info(
+        `Reusing existing region for market ${marketSeeder.id}.`,
+      );
+      continue;
+    }
+
+    marketSeedersToCreate.push(marketSeeder);
+  }
+
+  if (marketSeedersToCreate.length) {
+    const { result: createdRegions } = await createRegionsWorkflow(container).run({
+      input: {
+        regions: marketSeedersToCreate.map((marketSeeder) => ({
+          name: marketSeeder.market.name,
+          currency_code: marketSeeder.market.currencyCode.toLowerCase(),
+          countries: marketSeeder.countries,
+          payment_providers: ["pp_system_default"],
+          metadata: getMarketMetadata(marketSeeder),
+        })),
+      },
+    });
+
+    marketSeedersToCreate.forEach((marketSeeder, index) => {
+      regionsByMarketId.set(marketSeeder.id, createdRegions[index]);
+    });
+  }
+
   logger.info("Finished seeding regions.");
 
   //TODO: this hangs the setup.sh seeding

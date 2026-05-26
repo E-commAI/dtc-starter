@@ -460,7 +460,7 @@ if [ -n "$ADMIN_USER" ]; then
   echo "👤 Creating admin user..."
   (
     cd "$BACKEND_DIR"
-    PATH="$BIN_DIR:$PATH" DATABASE_URL="$DATABASE_URL" MEDUSA_SKIP_PGLITE_DB_EXISTS_CHECK="$USE_PGLITE" MEDUSA_SKIP_PGLITE_MIGRATION_LOCK="$USE_PGLITE" "$DENO" run -A npm:@medusajs/cli user -e "$ADMIN_USER" -p "$ADMIN_PASS"
+    PATH="$BIN_DIR:$PATH" DATABASE_URL="$DATABASE_URL" PGHOST="$PGLITE_HOST" PGPORT="$PGLITE_PORT" PGLITE_MAX_CONNECTIONS="$PGLITE_MAX_CONNECTIONS" "$DENO" run --allow-all scripts/run-medusa-cli-with-db.ts user -e "$ADMIN_USER" -p "$ADMIN_PASS"
   )
   echo ""
 fi

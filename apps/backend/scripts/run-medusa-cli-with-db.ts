@@ -1,7 +1,10 @@
+// @ts-nocheck
+
 import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { delimiter, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Client } from "npm:pg";
 
 const SCRIPT_DIR = fileURLToPath(new URL(".", import.meta.url));
 const BACKEND_DIR = fileURLToPath(new URL("..", import.meta.url));
@@ -32,6 +35,20 @@ const pathExists = async (path: string) => {
 };
 
 const delay = (ms: number) => new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+
+const canConnect = async () => {
+  try {
+    const connection = await Deno.connect({
+      hostname: PGLITE_HOST,
+      port: Number(PGLITE_PORT),
+    });
+
+    connection.close();
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const prependPath = (pathValue?: string | null) => {
   if (!pathValue) {
@@ -96,20 +113,60 @@ const waitForPglite = async (child: Deno.ChildProcess) => {
       throw new Error("PGlite exited before it was ready");
     }
 
-    try {
-      const connection = await Deno.connect({
-        hostname: PGLITE_HOST,
-        port: Number(PGLITE_PORT),
-      });
-
-      connection.close();
+    if (await canConnect()) {
       return;
-    } catch {
-      await delay(1000);
     }
+
+    await delay(1000);
   }
 
   throw new Error(`Timed out waiting for PGlite on ${PGLITE_HOST}:${PGLITE_PORT}`);
+};
+
+const getOptionValue = (args: string[], ...names: string[]) => {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    for (const name of names) {
+      if (arg === name) {
+        return args[index + 1];
+      }
+
+      const prefix = `${name}=`;
+
+      if (arg.startsWith(prefix)) {
+        return arg.slice(prefix.length);
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const userExists = async (databaseUrl: string, email: string) => {
+  const client = new Client({
+    connectionString: databaseUrl,
+  });
+
+  await client.connect();
+
+  try {
+    const result = await client.query<{ exists: boolean }>(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM "user"
+          WHERE lower(email) = lower($1)
+            AND deleted_at IS NULL
+        ) AS exists
+      `,
+      [email]
+    );
+
+    return result.rows[0]?.exists === true;
+  } finally {
+    await client.end();
+  }
 };
 
 const runCheckedCommand = async (
@@ -162,16 +219,20 @@ const main = async (): Promise<number> => {
         PGLITE_MAX_CONNECTIONS,
       };
 
-      console.log("Starting local PGlite database...");
-      pgliteChild = new Deno.Command(Deno.execPath(), {
-        args: ["run", "--allow-all", START_PGLITE_SCRIPT],
-        cwd: REPO_ROOT,
-        stdout: "inherit",
-        stderr: "inherit",
-        env: pgliteEnv,
-      }).spawn();
+      if (await canConnect()) {
+        console.log("Reusing local PGlite database...");
+      } else {
+        console.log("Starting local PGlite database...");
+        pgliteChild = new Deno.Command(Deno.execPath(), {
+          args: ["run", "--allow-all", START_PGLITE_SCRIPT],
+          cwd: REPO_ROOT,
+          stdout: "inherit",
+          stderr: "inherit",
+          env: pgliteEnv,
+        }).spawn();
 
-      await waitForPglite(pgliteChild);
+        await waitForPglite(pgliteChild);
+      }
 
       console.log("Patching migration internals for local PGlite...");
       await runCheckedCommand(
@@ -182,6 +243,15 @@ const main = async (): Promise<number> => {
 
       baseEnv.MEDUSA_SKIP_PGLITE_DB_EXISTS_CHECK = "1";
       baseEnv.MEDUSA_SKIP_PGLITE_MIGRATION_LOCK = "1";
+    }
+
+    if (Deno.args[0] === "user") {
+      const email = getOptionValue(Deno.args, "-e", "--email");
+
+      if (email && (await userExists(databaseUrl, email))) {
+        console.log(`Admin user ${email} already exists. Skipping creation.`);
+        return 0;
+      }
     }
 
     medusaChild = new Deno.Command(Deno.execPath(), {
